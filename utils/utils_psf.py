@@ -2,9 +2,11 @@
 # modified from
 # 08-May-2015, Behzad Tabibian
 import numpy as np
-import scipy.io
+import scipy.io as sio
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import cv2
+import os
 
 
 def normalize_PSF(psf, method='local'):
@@ -80,7 +82,7 @@ def camera_motion_to_psf():
              'Distance': 620.0,
              'Crop': 800
              }
-    walk = scipy.io.loadmat(
+    walk = sio.loadmat(
         "/home/xiu/databag/deblur/ICCV2021/motion_blur/500Frames/walkAll.mat")
     ker = PSFprojection(walk['walk'], param)
     return ker

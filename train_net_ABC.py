@@ -16,13 +16,17 @@ from models.uabcnet import UABCNet as net
 
 
 def main():
+	# Use this for a specific PSF after the model has been trained for the general case using pretrain_net_SR.py
 	# ----------------------------------------
 	# load kernels
 	# ----------------------------------------
+
+	# Take a single PSF grid from ./data as an .npz file
 	PSF_grid = np.load('./data/AC254-075-A-ML-Zemax(ZMX).npz')['PSF']
 	PSF_grid = PSF_grid.astype(np.float32)
 	gx,gy = PSF_grid.shape[:2]
 
+	# Normalize it and convert to tensor4
 	k_tensor = []
 	for yy in range(gy):
 		for xx in range(gx):
@@ -35,6 +39,7 @@ def main():
 	# ----------------------------------------
 	# load model
 	# ----------------------------------------
+	# Defines the architecture, loads the weights from ./data
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	model = net(n_iter=8, h_nc=64, in_nc=4, out_nc=3, nc=[64, 128, 256, 512],
 					nb=2, act_mode="R", downsample_mode='strideconv', upsample_mode="convtranspose")
@@ -47,7 +52,7 @@ def main():
 	# ----------------------------------------
 	# load training data
 	# ----------------------------------------
-	imgs = glob.glob('/home/xiu/databag/deblur/images/*/**.png',recursive=True)
+	imgs = glob.glob('./images/*/**.png',recursive=True)
 	imgs.sort()
 
 
@@ -56,7 +61,6 @@ def main():
 	# ----------------------------------------
 	stage = 8
 	ab_buffer = np.ones((gx,gy,2*stage,3),dtype=np.float32)*0.1
-	#ab_buffer[:,:,0,:] = 0.01
 	ab = torch.tensor(ab_buffer,device=device,requires_grad=True)
 
 	# ----------------------------------------
@@ -78,7 +82,6 @@ def main():
 	running = True
 
 	while running:
-		#alpha.beta
 		img_idx = np.random.randint(len(imgs))
 		img = imgs[img_idx]
 		img_H = cv2.imread(img)

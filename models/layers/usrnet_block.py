@@ -2,6 +2,7 @@ from collections import OrderedDict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import sys
 
 '''
 # ===================================
@@ -183,7 +184,10 @@ class ResBlock(nn.Module):
 
     def forward(self, x):
         res = self.res(x)
-        return x + res
+        sres = res.element_size() * res.nelement()
+        sx = x.element_size() * x.nelement()
+        res += x
+        return res
 
 
 # -------------------------------------------------------
