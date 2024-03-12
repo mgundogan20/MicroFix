@@ -157,9 +157,12 @@ def main():
 
 	#3.load training data
 	imgs_H = glob.glob('./images/DIV2K_train/*.png',recursive=True)
-	imgs_L = glob.glob('./images/DIV2K_lr/*.png', recursive=True)
 	imgs_H.sort()
-	imgs_L.sort()
+
+	# The following can be uncommented to provide aberrated images directly
+	# But the draw_training_pair() call within main() should also be modified accordingly
+	# imgs_L = glob.glob('./images/DIV2K_lr/*.png', recursive=True)
+	# imgs_L.sort()
 
 	global_iter = 0
 	N_maxiter = 200000
