@@ -33,10 +33,10 @@ def draw_random_kernel(kernels,patch_num):
 	# Patch num is a tuple denoting the shape of the grid (GH x GW)
 	# Returns PSF (GH x GW x H x W x C)
 	n = len(kernels)
-	if n<=0:
+	i = np.random.randint(n+1)
+	if n==i:
 		psf = gaussian_kernel_map(patch_num)
 	else:
-		i = np.random.randint(2*n)
 		psf = kernels[i]
 	return psf
 
@@ -109,10 +109,10 @@ def main():
 	# ----------------------------------------
 	# global configs
 	# ----------------------------------------
-	sf = 4					# Scaling factor between Resunet Layers
+	sf = 4					# HighRes patches are of shape (low_res_w*sf x low_res_h*sf)
 	stage = 8
-	patch_size = [32,32]
-	patch_num = [3,3]
+	patch_size = [32,32]	# LowRes patches are of shape (patch_size) 
+	patch_num = [3,3]		# Takes 3x3=9 patches in one "batch"
 	print("Global configs set.")
 	
 	# ----------------------------------------
@@ -146,7 +146,9 @@ def main():
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	model = net(n_iter=8, h_nc=64, in_nc=4, out_nc=3, nc=[64, 128, 256, 512],
 					nb=2,sf=sf, act_mode="R", downsample_mode='strideconv', upsample_mode="convtranspose")
-	#model.proj.load_state_dict(torch.load('./data/usrnet_pretrain.pth'),strict=True)
+	# Uncomment the following to load a checkpoint
+	# model.load_state_dict(torch.load('./logs/models/uabcnet.pth'),strict=True)
+	
 	model.train()
 	for _, v in model.named_parameters():
 		v.requires_grad = True
@@ -186,7 +188,7 @@ def main():
 	# imgs_L.sort()
 
 	global_iter = 0
-	N_maxiter = 20
+	N_maxiter = 20000
 
 
 	for i in range(N_maxiter):
@@ -195,38 +197,38 @@ def main():
 		#draw random image.
 		img_idx = np.random.randint(len(imgs_H))
 		img_H = cv2.imread(imgs_H[img_idx])
-		print("Training on image:", img_idx)
+		# print("\nTraining on image:", img_idx)
 
 		#draw random kernel
 		PSF_grid = draw_random_kernel(all_PSFs,patch_num)
-		print("Lens PSF choosen or generated:")
+		# print("Lens PSF choosen or generated:")
 
 		# Cuts a random patch from the original image and the psf
 		# Creates the noisy version
 		patch_L,patch_H,patch_psf = draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
-		print("Patches are generated")
+		# print("Patches are generated")
 
 		# Time to generate the data
 		t_data = time.time()-t0
-		print("Data prepared in:", (t_data))
+		# print("Data prepared in:", (t_data))
 
 		# Converts both the original and noisy patches to tensor4 objects
 		x = util.uint2single(patch_L)
 		x = util.single2tensor4(x)
 		x_gt = util.uint2single(patch_H)
 		x_gt = util.single2tensor4(x_gt)
-		print("Inputs are converted to tensors")
+		# print("Inputs are converted to tensors")
 
 		k_local = []
 		for h_ in range(patch_num[1]):
 			for w_ in range(patch_num[0]):
 				k_local.append(util.single2tensor4(patch_psf[w_,h_]))
 		k = torch.cat(k_local,dim=0)
-		print("Kernels are converted into tensors")
+		# print("Kernels are converted into tensors")
 
 		# Data are moved to the gpu
 		[x,x_gt,k] = [el.to(device) for el in [x,x_gt,k]]
-		print("Data loaded to:", device)
+		# print("Data loaded to:", device)
 		
 		ab_patch = F.softplus(ab)
 		ab_patch_v = []
@@ -249,26 +251,22 @@ def main():
 		# Time to update model parameters after data preprocessing
 		t_iter = time.time() - t0 - t_data
 
-		print('[iter:{}] loss:{:.4f}, data_time:{:.2f}s, net_time:{:.2f}s'.format(global_iter+1,loss.item(),t_data,t_iter))
 
-		# Display ground_truth (patch_H), aberrated image(patch_L) and recovered image(patch_E)
-		patch_L = cv2.resize(patch_L,dsize=None,fx=sf,fy=sf,interpolation=cv2.INTER_NEAREST)
-		patch_E = util.tensor2uint((x_E))
-		show = np.hstack((patch_H,patch_L,patch_E))
-		cv2.imshow('H,L,E',show)
-		key = cv2.waitKey(1)
+		# Display or save ground_truth (patch_H), aberrated image(patch_L) and recovered image(patch_E)
+		if global_iter%100==0:
+			print('[iter:{}] loss:{:.4f}, data_time:{:.2f}s, net_time:{:.2f}s'.format(global_iter+1,loss.item(),t_data,t_iter))
+			patch_L = cv2.resize(patch_L,dsize=None,fx=sf,fy=sf,interpolation=cv2.INTER_NEAREST)
+			patch_E = util.tensor2uint((x_E))
+			show = np.hstack((patch_H,patch_L,patch_E))
+			#cv2.imshow('H,L,E',show)
+			cv2.imwrite('./logs/images/{:05d}.png'.format(global_iter+1,),show)
+
+			torch.save(model.state_dict(),'./logs/models/uabcnet_{:05d}.pth'.format(global_iter+1))
+
 		global_iter+= 1
+	
 
-		# for logging model weight.
-		# if global_iter % 100 ==0:
-		# 	torch.save(model.state_dict(),'./logs/uabcnet_{}.pth'.format(global_iter))
-
-		if key==ord('q'):
-			break
-		if key==ord('s'):
-			torch.save(model.state_dict(),'./logs/uabcnet.pth')
-
-	torch.save(model.state_dict(),'./logs/uabcnet.pth')
+	torch.save(model.state_dict(),'./logs/models/uabcnet.pth')
 
 if __name__ == '__main__':
 
