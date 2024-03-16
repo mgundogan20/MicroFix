@@ -121,7 +121,7 @@ def lens_param_to_psf():
                 Z[i][j] = 0
 
     fig = __plt__.figure(1)
-    ax = fig.gca(projection='3d')
+    ax = Axes3D(fig)
     surf = ax.plot_surface(X, Y, Z, rstride=1, cstride=1, cmap=__cm__.RdYlGn,
                            linewidth=0, antialiased=False, alpha=0.6)
 

@@ -2,6 +2,7 @@ import torch
 import torch.optim
 import torch.nn.functional as F
 
+import copy
 import cv2
 import os.path
 import time
@@ -13,6 +14,51 @@ import utils.utils_image as util
 import utils.utils_deblur as util_deblur
 import utils.utils_psf as util_psf
 from models.uabcnet import UABCNet as net
+
+def check_val_accuracy(data_val, sf, ab, model, device, all_PSFs, patch_num, patch_size):
+	# Measures the error as the L2 distance between output and the ground_truth
+	# Normalizes it. Then takes the cube to better distinguish accuracies near 1
+	# Data_val is a list of image paths
+	 
+	print('\nChecking accuracy on validation set')
+	model.eval()
+	avg_error = 0
+
+	with torch.no_grad():
+		for img_val in data_val:
+			PSF_grid = draw_random_kernel(all_PSFs,patch_num)
+			img_val = cv2.imread(img_val)
+			patch_L,patch_H,patch_psf = draw_training_pair(img_val,PSF_grid,sf,patch_num,patch_size)
+			
+			x = util.uint2single(patch_L)
+			x = util.single2tensor4(x)
+			x_gt = util.uint2single(patch_H)
+			x_gt = util.single2tensor4(x_gt)
+
+			k_local = []
+			for h_ in range(patch_num[1]):
+				for w_ in range(patch_num[0]):
+					k_local.append(util.single2tensor4(patch_psf[w_,h_]))
+			k = torch.cat(k_local,dim=0)
+
+			[x,x_gt,k] = [el.to(device) for el in [x,x_gt,k]]
+			
+			ab_patch = F.softplus(ab)
+			ab_patch_v = []
+			for h_ in range(patch_num[1]):
+				for w_ in range(patch_num[0]):
+					ab_patch_v.append(ab_patch[w_:w_+1,h_])
+			ab_patch_v = torch.cat(ab_patch_v,dim=0)
+
+			# One forward pass is calculated
+			x_E = model.forward_patchwise_SR(x,k,ab_patch_v,patch_num,[patch_size[0],patch_size[1]],sf).detach()
+			x_gt = x_gt.detach()
+
+			# Estimate the error
+			avg_error += torch.linalg.norm(x_E-x_gt).item() / (torch.numel(x_gt)**0.5)
+		avg_error /= len(data_val) # Error metric shouldn't depend on the number of images in the validation set
+		print("Mean accuracy:", (1-avg_error)**3)
+	return (1-avg_error)**3
 
 def load_kernels(kernel_path):
 	# Loads all PSF_grids (GH x GW x H x W x C) from .npz files in kernel_path
@@ -148,8 +194,7 @@ def main():
 					nb=2,sf=sf, act_mode="R", downsample_mode='strideconv', upsample_mode="convtranspose")
 	# Uncomment the following to load a checkpoint
 	# model.load_state_dict(torch.load('./logs/models/uabcnet.pth'),strict=True)
-	
-	model.train()
+		
 	for _, v in model.named_parameters():
 		v.requires_grad = True
 	model = model.to(device)
@@ -182,16 +227,24 @@ def main():
 	print("Training data loaded")
 	print("Training on", len(imgs_H), "samples...")
 
+	# Take a 100 images aside for validation
+	imgs_val = imgs_H[:100]
+	imgs_H = imgs_H[100:]
+
 	# This part can be uncommented to provide aberrated images directly instead of manual generation
 	# In this case, the draw_training_pair() call within main() should also be modified accordingly
 	# imgs_L = glob.glob('./images/DIV2K_lr/*.png', recursive=True)
 	# imgs_L.sort()
 
 	global_iter = 0
-	N_maxiter = 20000
+	N_maxiter = 20001
+	losses = []
+	val_accs = []
+	best_models = []
 
 
 	for i in range(N_maxiter):
+		model.train()
 
 		t0 = time.time()
 		#draw random image.
@@ -241,8 +294,9 @@ def main():
 		x_E = model.forward_patchwise_SR(x,k,ab_patch_v,patch_num,[patch_size[0],patch_size[1]],sf)
 
 		# Corresponding loss and gradiants are calculated
-		# Weights are updated
+		# Weights are updated and the loss is logged
 		loss = F.l1_loss(x_E,x_gt)
+		losses.append(loss.item())
 		optimizer.zero_grad()
 		loss.backward()
 		optimizer.step()
@@ -254,19 +308,43 @@ def main():
 
 		# Display or save ground_truth (patch_H), aberrated image(patch_L) and recovered image(patch_E)
 		if global_iter%100==0:
-			print('[iter:{}] loss:{:.4f}, data_time:{:.2f}s, net_time:{:.2f}s'.format(global_iter+1,loss.item(),t_data,t_iter))
+			# Check the average accuracy in the validation set every 100 iterations
+			# Keep track of the 3 best performers thus far
+			# Taking the negative of the val_acc is just to make the list manipulations easier
+			val_acc = -check_val_accuracy(imgs_val, sf, ab, model, device, all_PSFs, patch_num, patch_size)
+			val_accs.append(val_acc)
+			if len(val_accs)<=3:
+				good_model_dict = copy.deepcopy(model.state_dict())
+				best_models.append((good_model_dict, -val_acc))
+			elif val_acc<=sorted(val_accs)[2]:
+				good_model_dict = copy.deepcopy(model.state_dict())
+				position = sorted(val_accs)[:3].index(val_acc)
+				best_models.insert(position, (good_model_dict, -val_acc))
+				best_models.pop()
+
 			patch_L = cv2.resize(patch_L,dsize=None,fx=sf,fy=sf,interpolation=cv2.INTER_NEAREST)
 			patch_E = util.tensor2uint((x_E))
 			show = np.hstack((patch_H,patch_L,patch_E))
 			#cv2.imshow('H,L,E',show)
-			cv2.imwrite('./logs/images/{:05d}.png'.format(global_iter+1,),show)
+			cv2.imwrite('./logs/images/{:05d}.png'.format(global_iter),show)
 
-			torch.save(model.state_dict(),'./logs/models/uabcnet_{:05d}.pth'.format(global_iter+1))
+		if global_iter%1000==999:
+			torch.save(model.state_dict(),'./logs/models/checkpoint_{:05d}.pth'.format(global_iter+1))
 
 		global_iter+= 1
+	# Save the 3 best performing models
+	for i, model_dict in enumerate(best_models):
+		torch.save(model_dict[0],'./logs/models/uabcnet_{:.4f}.pth'.format(model_dict[1]))
 	
-
-	torch.save(model.state_dict(),'./logs/models/uabcnet.pth')
+	print("Saving the loss curve to ../results/logs/")
+	_, (ax1, ax2) = plt.subplots(2)
+	ax1.set(ylabel="training losses")
+	ax1.plot(losses)
+	ax2.plot(np.linspace(0, len(losses)-1,len(val_accs)),[-val for val in val_accs])
+	ax2.set(ylabel="validation accuracies")
+	plt.xlabel("iteration")
+	plt.savefig("../results/logs/losses.png")
+	# plt.show()
 
 if __name__ == '__main__':
 
