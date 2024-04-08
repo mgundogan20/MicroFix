@@ -98,7 +98,6 @@ def gaussian_kernel_map(patch_num):
 			PSF[w_,h_,...,2] = util_deblur.gen_kernel()
 	return PSF
 
-
 def draw_training_pair(image_H,psf,sf,patch_num,patch_size,image_L=None):
 	# image_H is the ground truth
 	# psf is a grid of PSFs (GH x GW x H x W x C)
@@ -176,7 +175,8 @@ def main():
 	# ----------------------------------------
 	# define model
 	# ----------------------------------------
-	# Defines the architecture, the one used by Li et. al. can be described as follows
+	# Defines the architecture
+	# The one used by Li et. al. can be described as follows
 	# model = net(n_iter=8, h_nc=64, in_nc=4, out_nc=3, nc=[64, 128, 256, 512],
 	# 				nb=2,sf=sf, act_mode="R", downsample_mode='strideconv', upsample_mode="convtranspose")
 	# Head	x-x1		(conv from 4 to 64 channels)
@@ -227,9 +227,9 @@ def main():
 	print("Training data loaded")
 	print("Training on", len(imgs_H), "samples...")
 
-	# Take a 100 images aside for validation
-	imgs_val = imgs_H[:100]
-	imgs_H = imgs_H[100:]
+	# Take 10% of all training images aside for validation
+	imgs_val = imgs_H[:len(imgs_H)//10]
+	imgs_H = imgs_H[len(imgs_H)//10:]
 
 	# This part can be uncommented to provide aberrated images directly instead of manual generation
 	# In this case, the draw_training_pair() call within main() should also be modified accordingly
