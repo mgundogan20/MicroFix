@@ -11,6 +11,12 @@ import os
 
 import utils.utils_deblur as util_deblur
 
+
+def choose_psf(kernels,patch_num,psf_idx):
+	psf = kernels[psf_idx]
+	psf = psf[:patch_num[0],:patch_num[1]]
+	return psf
+
 def gaussian_kernel_map(patch_num):
 	# Generates a PSF_grid using util_deblur.gen_kernel() for each color RGB
 	# Patch num is a tuple denoting the shape of the grid (GH x GW)

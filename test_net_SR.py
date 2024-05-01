@@ -13,11 +13,6 @@ from models.uabcnet import UABCNet as net
 
 np.random.seed(15)
 
-def choose_psf(kernels,patch_num,psf_idx):
-	psf = kernels[psf_idx]
-	psf = psf[:patch_num[0],:patch_num[1]]
-	return psf
-
 def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, save_path='./logs/test', kernel_path='./data'):
 	#0. global config
 	#scale factor
@@ -29,6 +24,10 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 	#1. local PSF
 	#shape: gx,gy,kw,kw,3
 	all_PSFs = util_psf.load_kernels(kernel_path)
+
+	#Choose the last PSF in the list (the one belonging to our microscope)
+	PSF_grid = util_psf.choose_psf(all_PSFs,patch_num,psf_idx=-1)
+
 
 	#2. local model
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -56,12 +55,11 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 
 	global_iter = 0
 
-	#Choose the last PSF in the list
-	PSF_grid = choose_psf(all_PSFs,patch_num,-1)
 
 	all_PSNR = []
 
 	for i in range(N_maxiter):
+		global_iter += 1
 		#draw random image.
 		img_idx = np.random.randint(len(imgs_H))
 		img_H = cv2.imread(imgs_H[img_idx])
@@ -100,7 +98,6 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 		print(util.calculate_psnr(patch_E,patch_H))
 		print(util.calculate_ssim(patch_E,patch_H), "\n")
 
-		global_iter += 1
 
 	np.savetxt(f"{save_path}/psnr.txt",all_PSNR)
 	print(f"Test results saved on {save_path}/psnr.txt")
@@ -110,8 +107,8 @@ if __name__ == '__main__':
 	imgs_H.extend(glob.glob('./images/cell_data/*.jpeg',recursive=True))
 	main(
 		dataset=imgs_H,
-		model_path='./logs/uabcnet.pth',
-		ab_path=None,
-		N_maxiter=5,
+		model_path='./logs/models/finetuned.pth',
+		ab_path='./logs/models/ab_finetuned.txt',
+		N_maxiter=50,
 		save_path='./logs/test',
 		kernel_path='./data')

@@ -132,7 +132,7 @@ def save_triplet(path, patch_H, patch_L, patch_E):
 	show = show.convert('RGB')
 	show = np.array(show)
 
-	cv2.imshow('H,L,E',np.array(show))
-	cv2.waitKey(1)
+	# cv2.imshow('H,L,E',np.array(show))
+	# cv2.waitKey(1)
 
 	cv2.imwrite(path,show)

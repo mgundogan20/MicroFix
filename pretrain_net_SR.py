@@ -106,7 +106,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 		imgs_L_val = imgs_L[:len(imgs_L)//10]
 		imgs_L = imgs_L[len(imgs_L)//10:]
 
-	global_iter = 1
+	global_iter = 0
 	losses = []
 	val_ssims = []
 	val_ssims_L = []
@@ -114,9 +114,12 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 	val_psnrs_L = []
 
 	best_model = copy.deepcopy(model.state_dict())
+	best_ab = copy.deepcopy(ab)
 	best_ssim = 0
 
 	for i in range(N_maxiter):
+		global_iter+= 1
+
 		# Pick a random image.
 		img_idx = np.random.randint(len(imgs_H))
 		img_H = cv2.imread(imgs_H[img_idx])
@@ -170,8 +173,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 		scheduler.step()
 
 		# Every 100 iterations, the image is saved and the model is validated
-		# Every 2000 iterations, the model is saved
-		if global_iter%5==0:
+		if global_iter%100==0:
 			patch_L = cv2.resize(patch_L,dsize=None,fx=sf,fy=sf,interpolation=cv2.INTER_NEAREST)
 			patch_E = util.tensor2uint((x_E))
 			util_train.save_triplet(f'{logs_directory}/images/pre{global_iter:05d}.png', patch_H, patch_L, patch_E)
@@ -181,24 +183,33 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 			val_ssims_L.append(val_ssim_L)
 			val_psnrs.append(val_psnr)
 			val_psnrs_L.append(val_psnr_L)
+
 			if val_ssim > best_ssim:
 				best_ssim = val_ssim
 				best_model = copy.deepcopy(model.state_dict())
+				best_ab = copy.deepcopy(ab)
+			
+			print("Validation completed for iteration {:05d}".format(global_iter))
 
+		# Every 2000 iterations, the model is saved
 		if global_iter%2000==0:
 			torch.save(model.state_dict(),f"{logs_directory}/models/checkpoint_{global_iter:05d}.pth")
 			print(f"Saved a model checkpoint at: {logs_directory}/models/checkpoint_{global_iter:05d}.pth")
 
-		global_iter+= 1
+			ab_numpy = ab.detach().cpu().numpy().flatten()
+			np.savetxt(f"{logs_directory}/models/checkpoint_{global_iter:05d}_ab.txt",ab_numpy)
 	# End of Training
-
 
 	torch.save(best_model, f"{logs_directory}/models/pretrained.pth")
 	print(f"Saved the best model to {logs_directory}/models/pretrained.pth")
+	ab_numpy = best_ab.detach().cpu().numpy().flatten()
+	np.savetxt('./logs/models/ab_pretrained.txt',ab_numpy)
+	print(f"Saved the best lambda/mu parameters to {logs_directory}/models/ab_pretrained.txt")
+
 
 	print(f"Saving the training graphs to {logs_directory}/pretraining.png")
 	_, (ax1, ax2, ax3) = plt.subplots(3)
-	ax1.set(ylabel="training losses")
+	ax1.set(ylabel="training losses", color="red")
 	ax1.plot(losses)
 	
 	ax2.plot(np.linspace(0, len(losses)-1,len(val_ssims)),val_ssims)
@@ -224,7 +235,7 @@ if __name__ == '__main__':
 	main(
 		trainingDataHigh=dataset,
 		kernel_path='./data',
-		N_maxiter=10,
+		N_maxiter=10000,
 		logs_directory="./logs")
 	
 	deltaT = time.time() - t0
