@@ -55,7 +55,6 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 	imgs_H.sort()
 
 	global_iter = 0
-	N_maxiter = 5
 
 	#Choose the last PSF in the list
 	PSF_grid = choose_psf(all_PSFs,patch_num,-1)
@@ -108,6 +107,7 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 
 if __name__ == '__main__':
 	imgs_H = glob.glob('./images/DIV2K_train/*.png',recursive=True)
+	imgs_H.extend(glob.glob('./images/cell_data/*.jpeg',recursive=True))
 	main(
 		dataset=imgs_H,
 		model_path='./logs/uabcnet.pth',

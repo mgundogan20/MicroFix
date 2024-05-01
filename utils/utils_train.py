@@ -61,15 +61,22 @@ def draw_training_pair(image_H,psf,sf,patch_num,patch_size,image_L=None):
 	return patch_L,patch_H,psf_patch
 
 
-def validate(imgs_val, PSF_grid, ab, sf, patch_num, patch_size, model, device):
+def validate(imgs_val, PSF_grid, ab, sf, patch_num, patch_size, model, device, imgs_val_L=None):
 	model.eval()
 	ssim = 0
+	ssim_L = 0
+	psnr = 0
+	psnr_L = 0
 
 	with torch.no_grad():
-		for img in imgs_val:
-			img_H = cv2.imread(img)
+		for img_idx in range(len(imgs_val)):
+			img_H = cv2.imread(imgs_val[img_idx])
 
-			patch_L,patch_H,patch_psf = draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+			if imgs_val_L is None:
+				patch_L,patch_H,patch_psf = draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+			else:
+				img_L = cv2.imread(imgs_val_L[imgs_val[img_idx]])
+				patch_L,patch_H,patch_psf = draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size,image_L=img_L)
 
 			x = util.uint2single(patch_L)
 			x = util.single2tensor4(x)
@@ -94,9 +101,13 @@ def validate(imgs_val, PSF_grid, ab, sf, patch_num, patch_size, model, device):
 			patch_E = util.tensor2uint((x_E))
 			
 			ssim += util.calculate_ssim(patch_H, patch_E)
+			psnr += util.calculate_psnr(patch_H, patch_E)
+
+			ssim_L += util.calculate_ssim(patch_H, cv2.resize(patch_L, patch_H.shape[:2]))
+			psnr_L += util.calculate_psnr(patch_H, cv2.resize(patch_L, patch_H.shape[:2]))
 
 	model.train()
-	return ssim/len(imgs_val)
+	return (ssim/len(imgs_val), psnr/len(imgs_val), ssim_L/len(imgs_val), psnr_L/len(imgs_val))
 
 def save_triplet(path, patch_H, patch_L, patch_E):
 

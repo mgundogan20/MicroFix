@@ -15,7 +15,7 @@ import utils.utils_psf as util_psf
 import utils.utils_train as util_train
 from models.uabcnet import UABCNet as net
 
-def main(dataset, kernel_path='./data', N_maxiter=10000, logs_directory="./logs", checkpoint_path=None):
+def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory="./logs", checkpoint_path=None, trainindDataLow=None):
 
 	# ----------------------------------------
 	# global configs
@@ -88,8 +88,8 @@ def main(dataset, kernel_path='./data', N_maxiter=10000, logs_directory="./logs"
 	# ----------------------------------------
 	# load training data
 	# ----------------------------------------
-	imgs_H = dataset
-	random.shuffle(imgs_H)
+	imgs_H = trainingDataHigh
+	imgs_H.sort()
 	print("Training data loaded")
 
 	# Take 10% images aside for validation
@@ -98,10 +98,13 @@ def main(dataset, kernel_path='./data', N_maxiter=10000, logs_directory="./logs"
 	print("Training on", len(imgs_H), "samples...")
 	print("Validating on", len(imgs_val), "samples...")
 
-	# This part can be uncommented to provide aberrated images directly instead of manual generation
-	# In this case, the draw_training_pair() call within main() should also be modified accordingly
-	# imgs_L = glob.glob('./images/DIV2K_lr/*.png', recursive=True)
-	# imgs_L.sort()
+	if trainindDataLow is not None:
+		imgs_L = trainindDataLow
+		imgs_L.sort()
+		print("Low resolution training data loaded")
+
+		imgs_L_val = imgs_L[:len(imgs_L)//10]
+		imgs_L = imgs_L[len(imgs_L)//10:]
 
 	global_iter = 1
 	losses = []
@@ -114,21 +117,23 @@ def main(dataset, kernel_path='./data', N_maxiter=10000, logs_directory="./logs"
 	best_ssim = 0
 
 	for i in range(N_maxiter):
-		#draw random image.
+		# Pick a random image.
 		img_idx = np.random.randint(len(imgs_H))
 		img_H = cv2.imread(imgs_H[img_idx])
 		# print("\nTraining on image:", img_idx)
 
-		#draw random kernel
+		# Pick a random kernel
 		PSF_grid = util_psf.draw_random_kernel(all_PSFs,patch_num)
 		# print("Lens PSF choosen or generated:")
 
-		# Cuts a random patch from the original image and the psf
-		# Creates the noisy version
-		patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
-		# print("Patches are generated")
+		# Cut a random patch from the original image and the psf
+		# Create the low resolution image if not provided
+		if trainindDataLow is None:
+			patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+		else:
+			img_L = cv2.imread(imgs_L[img_idx])
+			patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size, image_L=img_L)
 
-	
 		x = util.uint2single(patch_L)
 		x = util.single2tensor4(x)
 		x_gt = util.uint2single(patch_H)
@@ -164,10 +169,9 @@ def main(dataset, kernel_path='./data', N_maxiter=10000, logs_directory="./logs"
 		optimizer.step()
 		scheduler.step()
 
-
 		# Every 100 iterations, the image is saved and the model is validated
 		# Every 2000 iterations, the model is saved
-		if global_iter%100==0:
+		if global_iter%5==0:
 			patch_L = cv2.resize(patch_L,dsize=None,fx=sf,fy=sf,interpolation=cv2.INTER_NEAREST)
 			patch_E = util.tensor2uint((x_E))
 			util_train.save_triplet(f'{logs_directory}/images/pre{global_iter:05d}.png', patch_H, patch_L, patch_E)
@@ -218,9 +222,9 @@ if __name__ == '__main__':
 	dataset.extend(glob.glob('./images/cell_data/*.jpeg',recursive=True))
 
 	main(
-		dataset=dataset,
+		trainingDataHigh=dataset,
 		kernel_path='./data',
-		N_maxiter=10000,
+		N_maxiter=10,
 		logs_directory="./logs")
 	
 	deltaT = time.time() - t0
