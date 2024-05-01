@@ -1,6 +1,7 @@
 # Xiu Li
 # modified from
 # 08-May-2015, Behzad Tabibian
+import glob
 import numpy as np
 import scipy.io as sio
 import matplotlib.pyplot as plt
@@ -8,6 +9,46 @@ import matplotlib.cm as cm
 import cv2
 import os
 
+import utils.utils_deblur as util_deblur
+
+def gaussian_kernel_map(patch_num):
+	# Generates a PSF_grid using util_deblur.gen_kernel() for each color RGB
+	# Patch num is a tuple denoting the shape of the grid (GH x GW)
+	# Returns PSF (GH x GW x H x W x C)
+	PSF = np.zeros((patch_num[0],patch_num[1],25,25,3))
+	for w_ in range(patch_num[0]):
+		for h_ in range(patch_num[1]):
+			PSF[w_,h_,...,0] = util_deblur.gen_kernel()
+			PSF[w_,h_,...,1] = util_deblur.gen_kernel()
+			PSF[w_,h_,...,2] = util_deblur.gen_kernel()
+	return PSF
+
+def draw_random_kernel(kernels,patch_num):
+	# Draws a random PSF_grid from kernels or generates if it's unavailable
+	# Kernels is a list of N PSFs. N x (GH_i x GW_i x H_i x W_i x C_i)
+	# Patch num is a tuple denoting the shape of the grid (GH x GW)
+	# Returns PSF (GH x GW x H x W x C)
+	n = len(kernels)
+	i = np.random.randint(n+1)
+	if n==i:
+		psf = gaussian_kernel_map(patch_num)
+	else:
+		psf = kernels[i]
+	return psf
+
+def load_kernels(kernel_path):
+	# Loads all PSF_grids (GH x GW x H x W x C) from .npz files in kernel_path
+	# Normalizes them
+	# Returns them in a list N x (GH_i x GW_i x H_i x W_i x C_i)
+	kernels = []
+	kernel_files = glob.glob(os.path.join(kernel_path,'*.npz'))
+	kernel_files.sort()
+	for kf in kernel_files:
+		print("loaded", kf)
+		PSF_grid = np.load(kf)['PSF']
+		PSF_grid = normalize_PSF(PSF_grid)
+		kernels.append(PSF_grid)
+	return kernels
 
 def normalize_PSF(psf, method='local'):
     psf = psf.astype(np.float32)
@@ -114,6 +155,7 @@ if __name__ == '__main__':
     bmpToPsfZemax(16, 16, 25, "../data/edmund_67462/20/psf.bmp","../data/Edmund_PSF_20.npz")
     bmpToPsfZemax(16, 16, 25, "../data/triplet/triplet.bmp","../data/triplet.npz")
     bmpToPsfZemax(16, 16, 25, "../data/triplet/triplet_20.bmp","../data/triplet_20.npz")
+    bmpToPsfZemax(16, 16, 25, "../data/triplet/psf_trip.bmp","../data/psf_trip.npz")
     
 
 
