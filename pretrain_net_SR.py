@@ -20,7 +20,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 	# ----------------------------------------
 	# global configs
 	# ----------------------------------------
-	sf = 2					# HighRes patches are of shape (low_res_w*sf x low_res_h*sf)
+	sf = 1					# HighRes patches are of shape (low_res_w*sf x low_res_h*sf)
 	stage = 8
 	patch_size = [64,64]	# LowRes patches are of shape (patch_size) 
 	patch_num = [2,2]		# Takes 3x3=9 patches in one "batch"
@@ -132,10 +132,10 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 		# Cut a random patch from the original image and the psf
 		# Create the low resolution image if not provided
 		if trainindDataLow is None:
-			patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+			patch_L,patch_H,patch_psf,patch_ab = util_train.draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size)
 		else:
 			img_L = cv2.imread(imgs_L[img_idx])
-			patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size, image_L=img_L)
+			patch_L,patch_H,patch_psf,patch_ab = util_train.draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size, image_L=img_L)
 
 		x = util.uint2single(patch_L)
 		x = util.single2tensor4(x)
@@ -211,6 +211,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 	_, (ax1, ax2, ax3) = plt.subplots(3)
 	ax1.set(ylabel="training losses")
 	ax1.plot(losses, color="red")
+	ax1.legend(["SR"], loc="upper right", fontsize="small")
 	
 	ax2.plot(np.linspace(0, len(losses)-1,len(val_ssims)),val_ssims)
 	ax2.plot(np.linspace(0, len(losses)-1,len(val_ssims)),val_ssims_L)

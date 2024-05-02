@@ -21,13 +21,19 @@ def draw_training_pair(image_H,psf,ab,sf,patch_num,patch_size,image_L=None):
 	max_X = gx-patch_num[0]
 	max_Y = gy-patch_num[1]
 
-	prob_X = np.array([(i-max_X/2)**4 for i in range(max_X+1)])
-	prob_X /= prob_X.sum()
-	px_start = np.random.choice(range(max_X+1), p=prob_X)
+	if max_X == 0:
+		px_start = 0
+	else:
+		prob_X = np.array([(i-max_X/2)**4 for i in range(max_X+1)])
+		prob_X /= prob_X.sum()
+		px_start = np.random.choice(range(max_X+1), p=prob_X)
 
-	prob_Y = np.array([(i-max_Y/2)**4 for i in range(max_Y+1)])
-	prob_Y /= prob_Y.sum()
-	py_start = np.random.choice(range(max_Y+1), p=prob_Y)
+	if max_Y == 0:
+		py_start = 0
+	else:
+		prob_Y = np.array([(i-max_Y/2)**4 for i in range(max_Y+1)])
+		prob_Y /= prob_Y.sum()
+		py_start = np.random.choice(range(max_Y+1), p=prob_Y)
 
 	psf_patch = psf[px_start:px_start+patch_num[0],py_start:py_start+patch_num[1]]
 	ab_patch = ab[px_start:px_start+patch_num[0],py_start:py_start+patch_num[1]]
@@ -82,10 +88,10 @@ def validate(imgs_val, PSF_grid, ab, sf, patch_num, patch_size, model, device, i
 			img_H = cv2.imread(imgs_val[img_idx])
 
 			if imgs_val_L is None:
-				patch_L,patch_H,patch_psf = draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+				patch_L,patch_H,patch_psf,patch_ab = draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size)
 			else:
 				img_L = cv2.imread(imgs_val_L[imgs_val[img_idx]])
-				patch_L,patch_H,patch_psf = draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size,image_L=img_L)
+				patch_L,patch_H,patch_psf,patch_ab = draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size,image_L=img_L)
 
 			x = util.uint2single(patch_L)
 			x = util.single2tensor4(x)

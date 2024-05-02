@@ -256,10 +256,7 @@ class RefSR(nn.Module):
 class UABCNet(nn.Module):
     def __init__(self, n_iter=8, h_nc=64, in_nc=4, out_nc=3, nc=[64, 128, 256, 512], nb=2, sf=4, act_mode='R', downsample_mode='strideconv', upsample_mode='convtranspose'):
         super(UABCNet, self).__init__()
-        if sf == 1:
-            self.deconv = RefDeconv()
-        else:
-            self.deconv = RefSR()
+        self.deconv = RefSR()
         self.proj = ResUNet(in_nc=in_nc, out_nc=out_nc, nc=nc, nb=nb, act_mode=act_mode,
                             downsample_mode=downsample_mode, upsample_mode=upsample_mode)
         self.proj.in_channels = in_nc

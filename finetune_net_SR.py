@@ -19,7 +19,7 @@ import utils.utils_train as util_train
 
 def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kernel_path='./data/Edmund_PSF_45.npz', N_maxiter=1000, logs_directory="./logs", ab_path=None,trainindDataLow=None):
 	# Global config
-	sf = 2	
+	sf = 1	
 	stage = 8
 	patch_size = [64,64]
 	patch_num = [2,2]
@@ -207,7 +207,7 @@ def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kern
 
 	ax3.plot(np.linspace(0, len(losses)-1,len(val_psnrs)),val_psnrs)
 	ax3.plot(np.linspace(0, len(losses)-1,len(val_psnrs)),val_psnrs_L)
-	ax3.legend(["output", "input"], bbox_to_anchor=(1,0), fontsize="small")
+	ax3.legend(["output", "input"], loc="lower right", fontsize="small")
 	ax3.set(ylabel="validation PSNRs")
 	
 	plt.savefig("./logs/finetuning.png")

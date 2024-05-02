@@ -16,7 +16,7 @@ np.random.seed(15)
 def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, save_path='./logs/test', kernel_path='./data'):
 	#0. global config
 	#scale factor
-	sf = 2	
+	sf = 1	
 	stage = 8
 	patch_size = [64,64]
 	patch_num = [2,2]
