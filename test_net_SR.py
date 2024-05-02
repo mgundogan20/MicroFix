@@ -16,18 +16,20 @@ np.random.seed(15)
 def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, save_path='./logs/test', kernel_path='./data'):
 	#0. global config
 	#scale factor
-	sf = 4	
+	sf = 2	
 	stage = 8
 	patch_size = [64,64]
 	patch_num = [2,2]
 
-	#1. local PSF
-	#shape: gx,gy,kw,kw,3
-	all_PSFs = util_psf.load_kernels(kernel_path)
-
-	#Choose the last PSF in the list (the one belonging to our microscope)
-	PSF_grid = util_psf.choose_psf(all_PSFs,patch_num,psf_idx=-1)
-
+	# Load kernel
+	PSF_grid = np.load(kernel_path)['PSF']
+	PSF_grid = PSF_grid.astype(np.float32)
+	gx, gy = PSF_grid.shape[:2]
+	
+	for w_ in range(gx):
+		for h_ in range(gy):
+			PSF_grid[w_,h_] = PSF_grid[w_,h_]/np.sum(PSF_grid[w_,h_],axis=(0,1))
+	
 
 	#2. local model
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -42,11 +44,10 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 
 	#positional lambda, mu for HQS, set as free trainable parameters here.
 	if ab_path is not None:
-		ab_buffer = np.loadtxt(ab_path).reshape((patch_num[0],patch_num[1],2*stage,3)).astype(np.float32)
+		ab_buffer = np.loadtxt(ab_path).reshape((gx,gy,2*stage,3)).astype(np.float32)
 	else:
-		ab_buffer = np.ones((patch_num[0],patch_num[1],2*stage,3),dtype=np.float32)*0.1
+		ab_buffer = np.ones((gx,gy,2*stage,3),dtype=np.float32)*0.1
 	ab = torch.tensor(ab_buffer,device=device,requires_grad=False)
-	#ab = F.softplus(ab)	
 	print("Lambd/mu parameters for HQS set")
 
 	#3.load training data
@@ -63,7 +64,7 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 		#draw random image.
 		img_idx = np.random.randint(len(imgs_H))
 		img_H = cv2.imread(imgs_H[img_idx])
-		patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+		patch_L,patch_H,patch_psf,patch_ab = util_train.draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size)
 
 		x = util.uint2single(patch_L)
 		x = util.single2tensor4(x)
@@ -77,7 +78,7 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 		k = torch.cat(k_local,dim=0)
 		[x,x_gt,k] = [el.to(device) for el in [x,x_gt,k]]
 		
-		ab_patch = F.softplus(ab)
+		ab_patch = F.softplus(patch_ab)
 		ab_patch_v = []
 		for h_ in range(patch_num[1]):
 			for w_ in range(patch_num[0]):
@@ -103,12 +104,14 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 	print(f"Test results saved on {save_path}/psnr.txt")
 
 if __name__ == '__main__':
-	imgs_H = glob.glob('./images/DIV2K_train/*.png',recursive=True)
+	imgs_H = []
+	# imgs_H.extend(glob.glob('./images/DIV2K_train/*.png',recursive=True))
 	imgs_H.extend(glob.glob('./images/cell_data/*.jpeg',recursive=True))
+
 	main(
 		dataset=imgs_H,
 		model_path='./logs/models/finetuned.pth',
 		ab_path='./logs/models/ab_finetuned.txt',
 		N_maxiter=50,
 		save_path='./logs/test',
-		kernel_path='./data')
+		kernel_path='./data/triplet_20.npz')

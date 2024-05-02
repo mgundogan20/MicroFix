@@ -203,14 +203,14 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 	torch.save(best_model, f"{logs_directory}/models/pretrained.pth")
 	print(f"Saved the best model to {logs_directory}/models/pretrained.pth")
 	ab_numpy = best_ab.detach().cpu().numpy().flatten()
-	np.savetxt('./logs/models/ab_pretrained.txt',ab_numpy)
+	np.savetxt(f"{logs_directory}/models/ab_pretrained.txt",ab_numpy)
 	print(f"Saved the best lambda/mu parameters to {logs_directory}/models/ab_pretrained.txt")
 
 
 	print(f"Saving the training graphs to {logs_directory}/pretraining.png")
 	_, (ax1, ax2, ax3) = plt.subplots(3)
-	ax1.set(ylabel="training losses", color="red")
-	ax1.plot(losses)
+	ax1.set(ylabel="training losses")
+	ax1.plot(losses, color="red")
 	
 	ax2.plot(np.linspace(0, len(losses)-1,len(val_ssims)),val_ssims)
 	ax2.plot(np.linspace(0, len(losses)-1,len(val_ssims)),val_ssims_L)

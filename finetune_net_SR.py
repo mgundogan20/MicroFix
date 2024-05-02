@@ -17,21 +17,25 @@ import matplotlib.pyplot as plt
 import utils.utils_psf as util_psf
 import utils.utils_train as util_train
 
-def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kernel_path='./data', N_maxiter=1000, logs_directory="./logs", ab_path=None,trainindDataLow=None):
-	#0. global config
+def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kernel_path='./data/Edmund_PSF_45.npz', N_maxiter=1000, logs_directory="./logs", ab_path=None,trainindDataLow=None):
+	# Global config
 	sf = 2	
 	stage = 8
 	patch_size = [64,64]
 	patch_num = [2,2]
 	print("Global configs set.")
 
-	#1. local PSF
-	all_PSFs = util_psf.load_kernels(kernel_path)
-	print("PSFs loaded.")	
-	#Choose the last PSF in the list (the one belonging to our microscope)
-	PSF_grid = util_psf.choose_psf(all_PSFs,patch_num, psf_idx=-1)
+	# Load kernel
+	PSF_grid = np.load(kernel_path)['PSF']
+	PSF_grid = PSF_grid.astype(np.float32)
+	gx, gy = PSF_grid.shape[:2]
+	
+	for w_ in range(gx):
+		for h_ in range(gy):
+			PSF_grid[w_,h_] = PSF_grid[w_,h_]/np.sum(PSF_grid[w_,h_],axis=(0,1))
+	
 
-	#2. load model
+	# Load model
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	model = net(n_iter=8, h_nc=64, in_nc=4, out_nc=3, nc=[64, 128, 256, 512],
 					nb=2,sf=sf, act_mode="R", downsample_mode='strideconv', upsample_mode="convtranspose")
@@ -54,9 +58,9 @@ def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kern
 
 	#positional lambda, mu for HQS.
 	if ab_path is not None:
-		ab_buffer = np.loadtxt(ab_path).reshape((patch_num[0],patch_num[1],2*stage,3)).astype(np.float32)
+		ab_buffer = np.loadtxt(ab_path).reshape((gx,gy,2*stage,3)).astype(np.float32)
 	else:
-		ab_buffer = np.zeros((patch_num[0],patch_num[1],2*stage,3))
+		ab_buffer = np.zeros((gx,gy,2*stage,3))
 		ab_buffer[:,:,::2,:]=0.01
 		ab_buffer[:,:,1::2,:]=0.1
 	ab = torch.tensor(ab_buffer,dtype=torch.float32,device=device,requires_grad=True)
@@ -117,10 +121,10 @@ def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kern
 		img_H = cv2.imread(imgs_H[img_idx])
 
 		if trainindDataLow is None:
-			patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size)
+			patch_L,patch_H,patch_psf,patch_ab = util_train.draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size)
 		else:
 			img_L = cv2.imread(imgs_L[img_idx])
-			patch_L,patch_H,patch_psf = util_train.draw_training_pair(img_H,PSF_grid,sf,patch_num,patch_size, image_L=img_L)
+			patch_L,patch_H,patch_psf,patch_ab = util_train.draw_training_pair(img_H,PSF_grid,ab,sf,patch_num,patch_size, image_L=img_L)
 
 		x = util.uint2single(patch_L)
 		x = util.single2tensor4(x)
@@ -134,7 +138,7 @@ def main(trainingDataHigh, model_load_path="./logs/models/uabcnet_pre.pth", kern
 		k = torch.cat(k_local,dim=0)
 		[x,x_gt,k] = [el.to(device) for el in [x,x_gt,k]]
 		
-		ab_patch = F.softplus(ab)
+		ab_patch = F.softplus(patch_ab)
 		ab_patch_v = []
 		for h_ in range(patch_num[1]):
 			for w_ in range(patch_num[0]):
@@ -219,10 +223,10 @@ if __name__ == '__main__':
 	main(
 		trainingDataHigh=dataset,
 		model_load_path="./logs/models/pretrained.pth",
-		kernel_path='./data',
+		kernel_path='./data/Edmund_PSF_45.npz',
 		N_maxiter=1000,
 		logs_directory="./logs",
-		ab_path="./logs/models/ab_pretrained.txt",
+		# ab_path="./logs/models/ab_pretrained.txt",
 		)
 	
 	deltaT = time.time() - t0
