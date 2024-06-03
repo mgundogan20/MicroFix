@@ -24,9 +24,9 @@ def gaussian_kernel_map(patch_num):
 	PSF = np.zeros((patch_num[0],patch_num[1],25,25,3))
 	for w_ in range(patch_num[0]):
 		for h_ in range(patch_num[1]):
-			PSF[w_,h_,...,0] = util_deblur.gen_kernel()
-			PSF[w_,h_,...,1] = util_deblur.gen_kernel()
-			PSF[w_,h_,...,2] = util_deblur.gen_kernel()
+			PSF[w_,h_,...,0] = util_deblur.gen_kernel(min_var=10)
+			PSF[w_,h_,...,1] = util_deblur.gen_kernel(min_var=10)
+			PSF[w_,h_,...,2] = util_deblur.gen_kernel(min_var=10)
 	return PSF
 
 def draw_random_kernel(kernels,patch_num):
@@ -126,22 +126,23 @@ def jpegToPsfHeidel(grid_h, grid_w, k_sz, k_sz_small, jpeg_folder_path, save_pat
     all_bbox = np.array(all_bbox)
     np.savez(save_path, PSF=PSF_small)
 
-def bmpToPsfZemax(grid_h, grid_w, k_sz_small, jpeg_folder_path, save_path):
+def zemax2psf(grid_h, grid_w, k_sz_small, k_sz, pad_bot, pad_left, pad_top, pad_right, image_path, save_path):
     # Converts PSFs given in jpeg format to npz format
     # The jpeg images contain a grid of kernels of shape 32x32.
     # The grid is of size grid_h x grid_w
     # The output npz file contains a PSF grid of shape (grid_h, grid_w, k_sz_small, k_sz_small, 3)
 
     img = cv2.imread(jpeg_folder_path)
-    k_sz = 32
-
+    
     PSF = np.zeros((grid_h, grid_w, k_sz, k_sz, 3), img.dtype)
     PSF_small = np.zeros((grid_h, grid_w, k_sz_small, k_sz_small, 3), img.dtype)
+
     for h_ in range(grid_h):
         for w_ in range(grid_w):
-            local_patch = img[32*h_:32*(h_+1),
-                              32*w_:32*(w_+1)]
-            PSF[h_, w_] = local_patch
+            x_start = w_*(k_sz+pad_left+pad_right) + pad_left
+            y_start = h_*(k_sz+pad_top+pad_bot) + pad_top
+
+            PSF[h_, w_] = img[y_start:y_start+k_sz, x_start:x_start+k_sz]
             PSF_small[h_, w_] = cv2.resize(PSF[h_, w_], dsize=(k_sz_small, k_sz_small))
 
     PSF_all = PSF.astype(np.float32)
@@ -157,12 +158,27 @@ if __name__ == '__main__':
     jpegToPsfHeidel(8, 12, 51, 25, "../data/achromatic_lens/psfs","../data/Heidel_PSF_achromatic_small.npz")
     jpegToPsfHeidel(7, 11, 49, 25, "../data/plano_convex_lens/psfs","../data/Heidel_PSF_plano_small.npz")
 
-    bmpToPsfZemax(16, 16, 25, "../data/edmund_67462/45/psf.bmp","../data/Edmund_PSF_45.npz")
-    bmpToPsfZemax(16, 16, 25, "../data/edmund_67462/20/psf.bmp","../data/Edmund_PSF_20.npz")
-    bmpToPsfZemax(16, 16, 25, "../data/triplet/triplet.bmp","../data/triplet.npz")
-    bmpToPsfZemax(16, 16, 25, "../data/triplet/triplet_20.bmp","../data/triplet_20.npz")
-    bmpToPsfZemax(16, 16, 25, "../data/triplet/psf_trip.bmp","../data/psf_trip.npz")
+    zemax2psf(grid_h=16,
+              grid_w=16, 
+              k_sz_small=64, 
+              k_sz=64, 
+              pad_bot=18, 
+              pad_left=18, 
+              pad_top=20, 
+              pad_right=20, 
+              image_path="../data/triplet/1_sim.bmp", 
+              save_path="../data/psf_trip_big.npz")
     
+    zemax2psf(grid_h=32,
+              grid_w=32,
+              k_sz_small=64,
+              k_sz=64,
+              pad_bot=5,
+              pad_left=18,
+              pad_top=7,
+              pad_right=20,
+              image_path="../data/triplet/res_sim.bmp",
+              save_path="../data/triplet_full_32x32.npz")
 
 
 
