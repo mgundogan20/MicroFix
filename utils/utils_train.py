@@ -117,9 +117,9 @@ def validate(imgs_val, PSF_grid, ab, sf, patch_num, patch_size, model, device, i
 			
 			ssim += util.calculate_ssim(patch_H, patch_E)
 			psnr += util.calculate_psnr(patch_H, patch_E)
-
-			ssim_L += util.calculate_ssim(patch_H, cv2.resize(patch_L, patch_H.shape[:2]))
-			psnr_L += util.calculate_psnr(patch_H, cv2.resize(patch_L, patch_H.shape[:2]))
+			
+			ssim_L += util.calculate_ssim(patch_H, patch_L)
+			psnr_L += util.calculate_psnr(patch_H, patch_H)
 
 	model.train()
 	return (ssim/len(imgs_val), psnr/len(imgs_val), ssim_L/len(imgs_val), psnr_L/len(imgs_val))

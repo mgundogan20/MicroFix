@@ -18,8 +18,8 @@ def main(dataset, model_path='./logs/uabcnet.pth', ab_path=None, N_maxiter=5, sa
 	#scale factor
 	sf = 1	
 	stage = 8
-	patch_size = [64,64]
-	patch_num = [2,2]
+	patch_size = [250,250]
+	patch_num = [3,3]
 
 	# Load kernel
 	PSF_grid = np.load(kernel_path)['PSF']
@@ -112,6 +112,6 @@ if __name__ == '__main__':
 		dataset=imgs_H,
 		model_path='./logs/models/finetuned.pth',
 		ab_path='./logs/models/ab_finetuned.txt',
-		N_maxiter=50,
+		N_maxiter=10,
 		save_path='./logs/test',
-		kernel_path='./data/triplet_20.npz')
+		kernel_path='./data/triplet_full_32x32.npz')

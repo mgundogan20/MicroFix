@@ -123,11 +123,11 @@ def blockConv2d(image,kernels,expand=0):
 			patch = image_pad[x_start:x_end,y_start:y_end]
 
 			output[x_start:x_start+patch_size,y_start:y_start+patch_size,0] \
-				= convolve2d(patch[...,0],kernels[w_,h_,:,:,0],'valid')
+				= convolve2d(patch[...,0],kernels[w_,h_,:,:,0],'valid')[:patch_size,:patch_size]
 			output[x_start:x_start+patch_size,y_start:y_start+patch_size,1] \
-				= convolve2d(patch[...,1],kernels[w_,h_,:,:,1],'valid')
+				= convolve2d(patch[...,1],kernels[w_,h_,:,:,1],'valid')[:patch_size,:patch_size]
 			output[x_start:x_start+patch_size,y_start:y_start+patch_size,2] \
-				= convolve2d(patch[...,2],kernels[w_,h_,:,:,2],'valid')
+				= convolve2d(patch[...,2],kernels[w_,h_,:,:,2],'valid')[:patch_size,:patch_size]
 	output = output.astype(np.uint8)
 	return output
 
