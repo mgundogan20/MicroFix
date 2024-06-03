@@ -23,6 +23,7 @@ Which should then display PSF grids such as:
 
 ## Training Images
 During training, a mixture of high resolution images from DIV2K dataset and our own microscopical images were used. We found out that natural images from DIV2K presents a variety within the training data, which allows more robust pretraining results.
+
 ![image](https://github.com/mgundogan20/MicroFix/assets/72755125/37ea8acb-7373-45ff-be87-c1269776ee96)
 ![image](https://github.com/mgundogan20/MicroFix/assets/72755125/04ddc47f-1ba2-4907-8432-cef2e1cb0700)
 
