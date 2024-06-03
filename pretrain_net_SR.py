@@ -24,6 +24,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 	stage = 8
 	patch_size = [64,64]	# LowRes patches are of shape (patch_size) 
 	patch_num = [2,2]		# Takes 3x3=9 patches in one "batch"
+	n_batch = 5				# Number of batches
 	print("Global configs set.")
 	
 	# ----------------------------------------
@@ -107,6 +108,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 		imgs_L = imgs_L[len(imgs_L)//10:]
 
 	global_iter = 0
+	avg_loss = 0
 	losses = []
 	val_ssims = []
 	val_ssims_L = []
@@ -165,12 +167,16 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 
 		# Corresponding loss and gradiants are calculated
 		# Weights are updated and the loss is logged
-		loss = F.l1_loss(x_E,x_gt)
+		loss = F.mse_loss(x_E,x_gt)
 		losses.append(loss.item())
-		optimizer.zero_grad()
-		loss.backward()
-		optimizer.step()
-		scheduler.step()
+		avg_loss += loss/n_batch
+
+		if global_iter%n_batch==0:
+			optimizer.zero_grad()
+			avg_loss.backward()
+			optimizer.step()
+			scheduler.step()
+			avg_loss = 0
 
 		# Every 100 iterations, the image is saved and the model is validated
 		if global_iter%100==0:
@@ -186,7 +192,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 
 			if val_ssim > best_ssim:
 				best_ssim = val_ssim
-				best_model = copy.deepcopy(model.state_dict())
+				best_model = copy.deepcopy(model)
 				best_ab = copy.deepcopy(ab)
 			
 			print("Validation completed for iteration {:05d}".format(global_iter))
@@ -200,7 +206,7 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 			np.savetxt(f"{logs_directory}/models/checkpoint_{global_iter:05d}_ab.txt",ab_numpy)
 	# End of Training
 
-	torch.save(best_model, f"{logs_directory}/models/pretrained.pth")
+	torch.save(best_model.state_dict(), f"{logs_directory}/models/pretrained.pth")
 	print(f"Saved the best model to {logs_directory}/models/pretrained.pth")
 	ab_numpy = best_ab.detach().cpu().numpy().flatten()
 	np.savetxt(f"{logs_directory}/models/ab_pretrained.txt",ab_numpy)
@@ -224,13 +230,14 @@ def main(trainingDataHigh, kernel_path='./data', N_maxiter=10000, logs_directory
 	
 	plt.xlabel("iteration")
 	plt.savefig(f"{logs_directory}/pretraining.png")
-	# plt.show()
+	plt.show()
 
 if __name__ == '__main__':
 	print("Pretraining the model.")
 	t0 = time.time()
 
-	dataset = glob.glob('./images/DIV2K_train/*.png',recursive=True)
+	dataset = []
+	dataset.extend(glob.glob('./images/DIV2K_train/*.png',recursive=True))
 	dataset.extend(glob.glob('./images/cell_data/*.jpeg',recursive=True))
 
 	main(
