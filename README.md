@@ -1,7 +1,9 @@
 # MicroFix
-Adapting the UNet architecture for image deconvolution to microscopy. 
+Microscopical aberration correction using the UNet architecture. 
 
 The architecture used here was borrowed from https://arxiv.org/abs/2104.03078
+
+<img src="https://github.com/mgundogan20/MicroFix/assets/72755125/ff3edf93-a607-4bbe-af32-3285f91a05cd" width="400px" alt="Before-After">
 
 ## PSF Grids
 
@@ -10,7 +12,7 @@ The architecture used here was borrowed from https://arxiv.org/abs/2104.03078
 2) A PSF grid is a 5D numpy array of shape:
 	
 		(grid_height, grid_width, kernel_height, kernel_width,channel count=3)
-These files were generated using the Image Simulation Analysis feature of Zemax. There is a function which would crop the actual kernels from the padded output of the software.
+These files were generated using the Image Simulation Analysis feature of Zemax. utils_psf.py contains function to handle the conversion from .bmp to .npz files.
 After acquiring the PSFs, you can display them using
 		python show_kernels.py
 Which should then display PSF grids such as:
